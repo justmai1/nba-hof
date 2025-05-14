@@ -22,6 +22,44 @@ geometry: margin=1in
 
 # Introduction
 
+The NBA Hall of Fame inducts the most influential players, coaches, teams, and referees
+yearly. There have only been just over 150 NBA players inducted to the Hall of Fame which
+started with the inaugural class of 1959. So what classifies an NBA player as a Hall of Famer
+compared to other NBA players? This research paper will identify the probability of current NBA players
+one day making the Hall of Fame based on historical trends.
+
+## Accolades and Awards
+
+A common debate within the basketball community is the infamous "LeBron vs. Michael Jordan" debate
+to crown on player as the Greatest of All Time (G.O.A.T.). Analysts will often start with the quantitative
+in game statistics by looking at all time averages for both players. Looking at the primary statistics, throughout
+Jordan's career, he averaged $30.1$ points per game, $6.2$ rebounds per game, and $5.3$ assists per game. On the other
+end, LeBron averages $27.0$ points per game, $7.5$ rebounds per game, and $7.4$ assists per game. While Jordan has the
+edge on scoring, LeBron has the edge in the other primary statistics so its difficult to make a clear conclusion
+based on this. However, this isn't the primary argument for both players, if you've ever been part of this debate
+you'll often hear the notion that "Jordan went 6 for 6 in championship games". The accolades and awards that each
+player compiles is often the primary argument.
+
+While there is no clear calculator for identifying if a player will make the Hall of Fame, in all cases, accolades and
+awards will be a significant predictor to identifying HOFers. These accolades will consist of **Regular Season MVPs, Championship Wins, Finals MVPs, All-NBA Selections, All-Star Selections, End-of-Season Awards** and possibly much more. These awards all signify the impact
+that a player has had on their respective teams, demonstrating how their contribution leads to the team's success.
+
+## Player Impact / Other Considerations
+
+Within the G.O.A.T debate, a primary argument for LeBron would be his longevity and consistent impact on the game
+and the teams he goes to, the qualitative factors that goes beyond the box score and award counts. While accolades and awards 
+provide a quantitative summary of a player's career, qualitative aspects such as leadership, clutch performances, career longevity, 
+influence on team culture, and global popularity often shape the broader legacy of a player.
+
+For example, LeBron’s ability to lead multiple franchises to the NBA Finals—winning championships with three different teams—is a testament 
+to his versatility and value as a player. Similarly, players like Allen Iverson and Vince Carter are celebrated not only for their 
+statistics and accolades, but also for their cultural impact, influence on future generations, and overall contribution to the evolution of the game.
+
+When making predictions for Hall of Fame inductees, there are also many traits outside of the box score that contributes to
+the selection process. However, this type of impact often correlates with the accolades and overall quantitative statistics so
+it will be contributing factor within the analysis. Something like longevity will also be taken into account through the number
+of years they played all together and the number of years they played for one team.
+
 # Methods
 
 # Results
@@ -31,3 +69,7 @@ geometry: margin=1in
 ## Limitations
 
 ## Next Steps
+
+# Bibliography
+
+https://www.sportingnews.com/us/nba/news/michael-jordan-vs-lebron-james-goat-debate/sl8xdozy5u1m1s4t5m3npeqo1
