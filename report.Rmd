@@ -1,0 +1,33 @@
+---
+title: "NBA Hall of Fame Prediction"
+author: "Justin Mai"
+date: "`r Sys.Date()`"
+output: 
+  pdf_document:
+    toc: true
+    number_sections: true
+    latex_engine: xelatex
+    keep_tex: true
+fontsize: 11pt
+documentclass: article
+mainfont: "Times New Roman"
+geometry: margin=1in
+---
+
+\newpage
+
+# Abstract
+
+\newpage
+
+# Introduction
+
+# Methods
+
+# Results
+
+# Discussion
+
+## Limitations
+
+## Next Steps
