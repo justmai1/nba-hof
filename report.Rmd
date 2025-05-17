@@ -72,6 +72,19 @@ of years they played all together and the number of years they played for one te
 df <- read.csv("data/final.csv")
 ```
 
+```{r}
+train <- read.csv("data/train.csv")
+test <- read.csv("data/test.csv")
+```
+
+```{r}
+M = glm(hof ~ num_all_star + num_season + pts_per_game + dpoy, family = binomial(link="logit"), data = train)
+M1 = glm(hof ~ num_all_star + pts_per_game + dpoy, family = binomial(link="logit"), data = train)
+
+anova(M, M1)
+```
+
+
 
 # Results
 
