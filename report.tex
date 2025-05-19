@@ -110,7 +110,7 @@
 
 \title{NBA Hall of Fame Prediction}
 \author{Justin Mai}
-\date{2025-05-15}
+\date{2025-05-19}
 
 \begin{document}
 \maketitle
@@ -173,12 +173,11 @@ career longevity, influence on team culture, and global popularity often
 shape the broader legacy of a player.
 
 For example, LeBron's ability to lead multiple franchises to the NBA
-Finals---winning championships with three different teams---is a
-testament to his versatility and value as a player. Similarly, players
-like Allen Iverson and Vince Carter are celebrated not only for their
-statistics and accolades, but also for their cultural impact, influence
-on future generations, and overall contribution to the evolution of the
-game.
+Finals---winning championships with three different teams is a testament
+to his versatility and value as a player. Similarly, players like Allen
+Iverson and Vince Carter are celebrated not only for their statistics
+and accolades, but also for their cultural impact, influence on future
+generations, and overall contribution to the evolution of the game.
 
 When making predictions for Hall of Fame inductees, there are also many
 traits outside of the box score that contributes to the selection
@@ -190,11 +189,180 @@ the number of years they played for one team.
 
 \section{Methods}\label{methods}
 
+\subsection{Data Collection}\label{data-collection}
+
+The data collected starts with all \textbf{5311} players who have played
+at least one game in the NBA since 1947 (when it was known as the BAA)
+to 2025. The data was collected by a Kaggle user named \emph{Sumitro
+Datta} in the page
+\textbf{\href{https://www.kaggle.com/datasets/sumitrodatta/nba-aba-baa-stats?select=Player+Career+Info.csv}{NBA
+Stats (1947-present)}}. The data was gathered using IMPORTHTML from
+Google Sheets on Basketball-Reference's Play Index now known as
+\textbf{\href{https://stathead.com/}{Stathead}}.
+
+\subsection{Data Manipulation}\label{data-manipulation}
+
+The majority of our data manipulation process in creating the primary
+dataset we would use was done using Python and JupyterNotebook.
+
+With the several datasets provided, there were different statistics that
+we required merging before curating our logistic regression model. We
+first looked at \textbf{player accolades} to get player award counts
+from the All-star, Awards, and End-Season-Teams tables. We turned each
+award into its own column so that every observation would be the number
+of that specific award a player won. We then combined these awards with
+the number of all-star games and number of seasons a player played in
+the NBA. This was all joined using a player's \emph{player\_id}
+
+We then wanted to combine in-game player statistics with the accolades
+dataset. These statistics will consist of both total career statistics
+and player averages to give us flexibility in choosing our model. For
+many of the players, there were NA values for some statistics that
+weren't yet accounted for (such as 3 pointers and some awards). These NA
+values were replaced with 0.
+
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{df }\OtherTok{\textless{}{-}} \FunctionTok{read.csv}\NormalTok{(}\StringTok{"data/final.csv"}\NormalTok{)}
 \end{Highlighting}
 \end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{train }\OtherTok{\textless{}{-}} \FunctionTok{read.csv}\NormalTok{(}\StringTok{"data/train.csv"}\NormalTok{)}
+
+\NormalTok{train}\SpecialCharTok{$}\NormalTok{mvp\_flag }\OtherTok{=} \FunctionTok{factor}\NormalTok{(}\FunctionTok{ifelse}\NormalTok{(train}\SpecialCharTok{$}\NormalTok{nba.mvp }\SpecialCharTok{\textgreater{}} \DecValTok{0}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{0}\NormalTok{))}
+
+\NormalTok{test }\OtherTok{\textless{}{-}} \FunctionTok{read.csv}\NormalTok{(}\StringTok{"data/test.csv"}\NormalTok{)}
+
+\NormalTok{test}\SpecialCharTok{$}\NormalTok{mvp\_flag }\OtherTok{=} \FunctionTok{factor}\NormalTok{(}\FunctionTok{ifelse}\NormalTok{(test}\SpecialCharTok{$}\NormalTok{nba.mvp }\SpecialCharTok{\textgreater{}} \DecValTok{0}\NormalTok{, }\DecValTok{1}\NormalTok{, }\DecValTok{0}\NormalTok{))}
+
+\CommentTok{\# Removing irrelevant columns}
+
+\NormalTok{train }\OtherTok{\textless{}{-}}\NormalTok{ train }\SpecialCharTok{\%\textgreater{}\%} 
+  \FunctionTok{select}\NormalTok{(}\SpecialCharTok{!}\FunctionTok{c}\NormalTok{(aba.mvp, aba.roy, clutch\_poy, All.ABA}\FloatTok{.1}\NormalTok{st, All.ABA}\FloatTok{.2}\NormalTok{nd, All.BAA}\FloatTok{.1}\NormalTok{st, All.BAA}\FloatTok{.2}\NormalTok{nd, mp, fga, x3pa, mp\_per\_game, x3p\_percent\_x, x2p, x3p, x2pa, x2p\_percent\_x, e\_fg\_percent\_x, ft, fta, fg))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{train}\OtherTok{\textless{}{-}}\NormalTok{ train }\SpecialCharTok{\%\textgreater{}\%} 
+  \FunctionTok{select}\NormalTok{(}\SpecialCharTok{!}\FunctionTok{c}\NormalTok{(orb, drb, orb\_per\_game, drb\_per\_game, pf, fg\_per\_game, fga\_per\_game, fg\_percent, x2p\_per\_game, x2pa\_per\_game, x2p\_percent\_y, e\_fg\_percent\_y, ft\_per\_game, fta\_per\_game, pts, blk, x3pa\_per\_game, x3p\_per\_game, tov))}
+
+\NormalTok{cor\_mat }\OtherTok{\textless{}{-}} \FunctionTok{cor}\NormalTok{(train[}\FunctionTok{sapply}\NormalTok{(train, is.numeric)], }\AttributeTok{use =} \StringTok{"complete.obs"}\NormalTok{)}
+
+\NormalTok{cor\_high }\OtherTok{\textless{}{-}} \FunctionTok{which}\NormalTok{(cor\_mat }\SpecialCharTok{\textgreater{}} \FloatTok{0.85} \SpecialCharTok{\&}\NormalTok{ cor\_mat }\SpecialCharTok{\textless{}} \DecValTok{1}\NormalTok{, }\AttributeTok{arr.ind =} \ConstantTok{TRUE}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{data.frame}\NormalTok{(}
+  \AttributeTok{var1 =} \FunctionTok{rownames}\NormalTok{(cor\_mat)[cor\_high[, }\DecValTok{1}\NormalTok{]],}
+  \AttributeTok{var2 =} \FunctionTok{colnames}\NormalTok{(cor\_mat)[cor\_high[, }\DecValTok{2}\NormalTok{]],}
+  \AttributeTok{correlation =}\NormalTok{ cor\_mat[cor\_high]}
+\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## [1] var1        var2        correlation
+## <0 rows> (or 0-length row.names)
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{set.seed}\NormalTok{(}\DecValTok{123}\NormalTok{)}
+\NormalTok{ctrl }\OtherTok{\textless{}{-}} \FunctionTok{trainControl}\NormalTok{(}\AttributeTok{method =} \StringTok{"cv"}\NormalTok{, }\AttributeTok{number =} \DecValTok{10}\NormalTok{, }\AttributeTok{savePredictions =} \ConstantTok{TRUE}\NormalTok{)}
+
+\NormalTok{train\_model }\OtherTok{\textless{}{-}}\NormalTok{ train[, }\SpecialCharTok{!}\FunctionTok{names}\NormalTok{(train) }\SpecialCharTok{\%in\%} \FunctionTok{c}\NormalTok{(}\StringTok{"player\_id"}\NormalTok{, }\StringTok{"player"}\NormalTok{, }\StringTok{"active\_2025"}\NormalTok{, }\StringTok{"nba\_mvp"}\NormalTok{)]}
+
+\NormalTok{M\_full }\OtherTok{\textless{}{-}} \FunctionTok{train}\NormalTok{(}
+\NormalTok{  hof }\SpecialCharTok{\textasciitilde{}}\NormalTok{ .,}
+  \AttributeTok{data =}\NormalTok{ train\_model,}
+  \AttributeTok{method =} \StringTok{"glm"}\NormalTok{,}
+  \AttributeTok{family =} \StringTok{"binomial"}\NormalTok{,}
+  \AttributeTok{trControl =}\NormalTok{ ctrl}
+\NormalTok{)}
+
+\NormalTok{M\_full}\SpecialCharTok{$}\NormalTok{resample}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##          RMSE  Rsquared        MAE Resample
+## 1  0.14224995 0.5787346 0.03045210   Fold01
+## 2  0.12069719 0.4977208 0.02332446   Fold02
+## 3  0.12398488 0.5263507 0.02585886   Fold03
+## 4  0.11122066 0.5876602 0.02406121   Fold04
+## 5  0.10731370 0.6077575 0.02192303   Fold05
+## 6  0.10368447 0.7071084 0.02408266   Fold06
+## 7  0.10148168 0.7521662 0.02020384   Fold07
+## 8  0.10251668 0.6048304 0.02143543   Fold08
+## 9  0.08825464 0.7611934 0.01936756   Fold09
+## 10 0.11762392 0.5535615 0.02411036   Fold10
+\end{verbatim}
+
+\[RMSE = \sqrt{\frac{1}{n} \sum_{i=1}^{n}(y_i - \hat{y}_i)^2}\]
+
+\[R^2 = 1- \frac{SS_{res}}{SS_{total}}\]
+
+\[MAE = \frac{1}{n} \sum_{i=1}^{n} |y_i - \hat{y}_i|\]
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{summary}\NormalTok{(M\_full)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## Call:
+## NULL
+## 
+## Coefficients:
+##                   Estimate Std. Error z value Pr(>|z|)    
+## (Intercept)     -1.309e+01  1.952e+00  -6.706 2.00e-11 ***
+## num_all_star     4.814e-01  9.435e-02   5.102 3.36e-07 ***
+## num_season       1.812e-01  8.048e-02   2.251  0.02438 *  
+## dpoy            -5.195e-04  4.791e-01  -0.001  0.99913    
+## mip             -1.086e+00  1.370e+00  -0.793  0.42795    
+## nba.mvp          9.740e+00  8.431e+02   0.012  0.99078    
+## nba.roy          5.419e-03  6.824e-01   0.008  0.99366    
+## smoy             1.092e+00  6.104e-01   1.790  0.07353 .  
+## All.Defense.1st  6.203e-01  2.051e-01   3.025  0.00249 ** 
+## All.Defense.2nd -4.735e-01  2.874e-01  -1.648  0.09942 .  
+## All.NBA.1st      5.963e-01  2.973e-01   2.005  0.04492 *  
+## All.NBA.2nd      6.674e-01  2.199e-01   3.036  0.00240 ** 
+## All.NBA.3rd      5.505e-01  3.246e-01   1.696  0.08992 .  
+## All.Rookie.1st   6.361e-01  4.095e-01   1.553  0.12038    
+## All.Rookie.2nd   1.604e+00  6.985e-01   2.296  0.02168 *  
+## trb             -1.945e-04  1.369e-04  -1.421  0.15538    
+## ast             -3.341e-04  3.070e-04  -1.088  0.27649    
+## stl             -3.236e-04  1.131e-03  -0.286  0.77482    
+## g                4.099e-02  1.636e-02   2.506  0.01219 *  
+## gs              -1.810e-02  1.329e-02  -1.362  0.17317    
+## x3p_percent_y   -3.981e+00  2.119e+00  -1.879  0.06030 .  
+## ft_percent       3.869e+00  2.329e+00   1.661  0.09664 .  
+## trb_per_game     1.832e-01  1.263e-01   1.450  0.14704    
+## ast_per_game     5.935e-01  2.690e-01   2.206  0.02737 *  
+## stl_per_game    -1.200e-01  9.524e-01  -0.126  0.89970    
+## blk_per_game    -8.240e-03  5.161e-01  -0.016  0.98726    
+## tov_per_game    -5.013e-01  2.805e-01  -1.788  0.07386 .  
+## pf_per_game      8.403e-01  3.020e-01   2.783  0.00539 ** 
+## pts_per_game    -8.669e-03  5.770e-02  -0.150  0.88057    
+## mvp_flag1       -7.472e+00  8.431e+02  -0.009  0.99293    
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## (Dispersion parameter for binomial family taken to be 1)
+## 
+##     Null deviance: 1420.92  on 4767  degrees of freedom
+## Residual deviance:  410.58  on 4738  degrees of freedom
+## AIC: 470.58
+## 
+## Number of Fisher Scoring iterations: 17
+\end{verbatim}
 
 \section{Results}\label{results}
 

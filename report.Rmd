@@ -17,6 +17,7 @@ geometry: margin=1in
 ```{r include=FALSE}
 library(tidyverse)
 library(corrplot)
+library(caret)
 ```
 
 
@@ -57,7 +58,7 @@ and the teams he goes to, the qualitative factors that goes beyond the box score
 provide a quantitative summary of a player's career, qualitative aspects such as leadership, clutch performances, career longevity, 
 influence on team culture, and global popularity often shape the broader legacy of a player.
 
-For example, LeBron’s ability to lead multiple franchises to the NBA Finals—winning championships with three different teams—is a testament 
+For example, LeBron’s ability to lead multiple franchises to the NBA Finals—winning championships with three different teams is a testament 
 to his versatility and value as a player. Similarly, players like Allen Iverson and Vince Carter are celebrated not only for their 
 statistics and accolades, but also for their cultural impact, influence on future generations, and overall contribution to the evolution of the game.
 
@@ -68,23 +69,83 @@ of years they played all together and the number of years they played for one te
 
 # Methods
 
+## Data Collection
+
+The data collected starts with all **5311** players who have played at least one game in the NBA since 1947 (when it was known as the BAA) to 2025. The data was collected by a Kaggle user named *Sumitro Datta* in the page **[NBA Stats (1947-present)](https://www.kaggle.com/datasets/sumitrodatta/nba-aba-baa-stats?select=Player+Career+Info.csv)**. The data was gathered using IMPORTHTML from Google Sheets on Basketball-Reference's Play Index now known as **[Stathead](https://stathead.com/)**.
+
+## Data Manipulation
+
+The majority of our data manipulation process in creating the primary dataset we would use was done using Python and JupyterNotebook.
+
+With the several datasets provided, there were different statistics that we required merging before curating our logistic regression model. We first looked at **player accolades** to get player award counts from the All-star, Awards, and End-Season-Teams tables. We turned each award into its own column so that every observation would be the number of that specific award a player won. We then combined these awards with the number of all-star games and number of seasons a player played in the NBA. This was all joined using a player's *player_id*
+
+We then wanted to combine in-game player statistics with the accolades dataset. These statistics will consist of both total career statistics and player averages to give us flexibility in choosing our model. For many of the players, there were NA values for some statistics that weren't yet accounted for (such as 3 pointers and some awards). These NA values were replaced with 0.
+
+## Model Transformations
+
 ```{r}
 df <- read.csv("data/final.csv")
 ```
 
 ```{r}
 train <- read.csv("data/train.csv")
+
+train$mvp_flag = factor(ifelse(train$nba.mvp > 0, 1, 0))
+
 test <- read.csv("data/test.csv")
+
+test$mvp_flag = factor(ifelse(test$nba.mvp > 0, 1, 0))
+
+# Removing irrelevant columns
+
+train <- train %>% 
+  select(!c(aba.mvp, aba.roy, clutch_poy, All.ABA.1st, All.ABA.2nd, All.BAA.1st, All.BAA.2nd, mp, fga, x3pa, mp_per_game, x3p_percent_x, x2p, x3p, x2pa, x2p_percent_x, e_fg_percent_x, ft, fta, fg))
 ```
 
 ```{r}
-M = glm(hof ~ num_all_star + num_season + pts_per_game + dpoy, family = binomial(link="logit"), data = train)
-M1 = glm(hof ~ num_all_star + pts_per_game + dpoy, family = binomial(link="logit"), data = train)
+train<- train %>% 
+  select(!c(orb, drb, orb_per_game, drb_per_game, pf, fg_per_game, fga_per_game, fg_percent, x2p_per_game, x2pa_per_game, x2p_percent_y, e_fg_percent_y, ft_per_game, fta_per_game, pts, blk, x3pa_per_game, x3p_per_game, tov))
 
-anova(M, M1)
+cor_mat <- cor(train[sapply(train, is.numeric)], use = "complete.obs")
+
+cor_high <- which(cor_mat > 0.85 & cor_mat < 1, arr.ind = TRUE)
+```
+
+```{r}
+data.frame(
+  var1 = rownames(cor_mat)[cor_high[, 1]],
+  var2 = colnames(cor_mat)[cor_high[, 2]],
+  correlation = cor_mat[cor_high]
+)
 ```
 
 
+```{r warning=FALSE}
+set.seed(123)
+ctrl <- trainControl(method = "cv", number = 10, savePredictions = TRUE)
+
+train_model <- train[, !names(train) %in% c("player_id", "player", "active_2025", "nba_mvp")]
+
+M_full <- train(
+  hof ~ .,
+  data = train_model,
+  method = "glm",
+  family = "binomial",
+  trControl = ctrl
+)
+
+M_full$resample
+```
+
+$$RMSE = \sqrt{\frac{1}{n} \sum_{i=1}^{n}(y_i - \hat{y}_i)^2}$$
+
+$$R^2 = 1- \frac{SS_{res}}{SS_{total}}$$
+
+$$MAE = \frac{1}{n} \sum_{i=1}^{n} |y_i - \hat{y}_i|$$
+
+```{r}
+summary(M_full)
+```
 
 # Results
 
