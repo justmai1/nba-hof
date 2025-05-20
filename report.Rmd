@@ -18,6 +18,7 @@ geometry: margin=1in
 library(tidyverse)
 library(corrplot)
 library(caret)
+library(glmnet)
 ```
 
 
@@ -81,7 +82,7 @@ With the several datasets provided, there were different statistics that we requ
 
 We then wanted to combine in-game player statistics with the accolades dataset. These statistics will consist of both total career statistics and player averages to give us flexibility in choosing our model. For many of the players, there were NA values for some statistics that weren't yet accounted for (such as 3 pointers and some awards). These NA values were replaced with 0.
 
-## Model Transformations
+## Data Transformation
 
 ```{r}
 df <- read.csv("data/final.csv")
@@ -100,11 +101,17 @@ test$mvp_flag = factor(ifelse(test$nba.mvp > 0, 1, 0))
 
 train <- train %>% 
   select(!c(aba.mvp, aba.roy, clutch_poy, All.ABA.1st, All.ABA.2nd, All.BAA.1st, All.BAA.2nd, mp, fga, x3pa, mp_per_game, x3p_percent_x, x2p, x3p, x2pa, x2p_percent_x, e_fg_percent_x, ft, fta, fg))
+
+test <- test %>% 
+  select(!c(aba.mvp, aba.roy, clutch_poy, All.ABA.1st, All.ABA.2nd, All.BAA.1st, All.BAA.2nd, mp, fga, x3pa, mp_per_game, x3p_percent_x, x2p, x3p, x2pa, x2p_percent_x, e_fg_percent_x, ft, fta, fg))
 ```
 
 ```{r}
 train<- train %>% 
-  select(!c(orb, drb, orb_per_game, drb_per_game, pf, fg_per_game, fga_per_game, fg_percent, x2p_per_game, x2pa_per_game, x2p_percent_y, e_fg_percent_y, ft_per_game, fta_per_game, pts, blk, x3pa_per_game, x3p_per_game, tov))
+  select(!c(orb, drb, orb_per_game, drb_per_game, pf, fg_per_game, fga_per_game, fg_percent, x2p_per_game, x2pa_per_game, x2p_percent_y, e_fg_percent_y, ft_per_game, fta_per_game, pts, blk, x3pa_per_game, x3p_per_game, tov, x3p_percent_y))
+
+test <- test %>% 
+  select(!c(orb, drb, orb_per_game, drb_per_game, pf, fg_per_game, fga_per_game, fg_percent, x2p_per_game, x2pa_per_game, x2p_percent_y, e_fg_percent_y, ft_per_game, fta_per_game, pts, blk, x3pa_per_game, x3p_per_game, tov, x3p_percent_y))
 
 cor_mat <- cor(train[sapply(train, is.numeric)], use = "complete.obs")
 
@@ -112,19 +119,25 @@ cor_high <- which(cor_mat > 0.85 & cor_mat < 1, arr.ind = TRUE)
 ```
 
 ```{r}
-data.frame(
-  var1 = rownames(cor_mat)[cor_high[, 1]],
-  var2 = colnames(cor_mat)[cor_high[, 2]],
-  correlation = cor_mat[cor_high]
-)
+cols_to_exclude <- c("player_id", "player", "mvp_flag", "active_2025")
+
+cols_to_sum <- setdiff(names(test), cols_to_exclude)
+
+test <- test %>%
+  group_by(player) %>%
+  summarise(across(all_of(cols_to_sum), sum, na.rm = TRUE), .groups = "drop") %>%
+  left_join(distinct(test[, cols_to_exclude]), by = "player")
+
+test <- test
 ```
 
 
-```{r warning=FALSE}
+```{r warning=FALSE, include=FALSE}
 set.seed(123)
 ctrl <- trainControl(method = "cv", number = 10, savePredictions = TRUE)
 
-train_model <- train[, !names(train) %in% c("player_id", "player", "active_2025", "nba_mvp")]
+train_model <- train[, !names(train) %in% c("player_id", "player", "active_2025", "nba.mvp")]
+test_model <- test[, !names(test) %in% c("player_id", "player", "active_2025", "nba.mvp", "hof")]
 
 M_full <- train(
   hof ~ .,
@@ -135,6 +148,8 @@ M_full <- train(
 )
 
 M_full$resample
+
+summary(M_full)
 ```
 
 $$RMSE = \sqrt{\frac{1}{n} \sum_{i=1}^{n}(y_i - \hat{y}_i)^2}$$
@@ -143,19 +158,112 @@ $$R^2 = 1- \frac{SS_{res}}{SS_{total}}$$
 
 $$MAE = \frac{1}{n} \sum_{i=1}^{n} |y_i - \hat{y}_i|$$
 
-```{r}
-summary(M_full)
+```{r include=FALSE}
+x <- model.matrix(hof ~ ., data = train_model)[, -1]
+y <- train$hof
 ```
+
+```{r warning=FALSE, include=FALSE}
+set.seed(123)
+cv_lasso <- cv.glmnet(
+  x, y,
+  alpha = 1,
+  family = "binomial",
+  type.measure = "class"
+)
+```
+
+```{r include=FALSE}
+coef(cv_lasso, s = "lambda.min")
+```
+
+```{r echo=FALSE}
+plot(cv_lasso)
+cv_lasso$lambda.min
+```
+
+```{r echo=FALSE}
+coef_table <- as.data.frame(as.matrix(coef(cv_lasso, s = "lambda.min"))) 
+coef_table <- tibble::rownames_to_column(coef_table, "Variable")
+colnames(coef_table)[2] <- "Coefficient"
+
+coef_table$Coefficient <- round(coef_table$Coefficient, 3)
+
+knitr::kable(coef_table, caption = "LASSO Model Coefficients")
+```
+
+
+
+```{r warning=FALSE, include=FALSE}
+set.seed(123)
+cv_ridge <- cv.glmnet(
+  x, y,
+  alpha = 0,
+  family = "binomial",
+  type.measure = "class"
+)
+```
+
+```{r include=FALSE}
+coef(cv_ridge, s = "lambda.min")
+```
+
+```{r echo=FALSE}
+coef_table <- as.data.frame(as.matrix(coef(cv_ridge, s = "lambda.min"))) 
+coef_table <- tibble::rownames_to_column(coef_table, "Variable")
+colnames(coef_table)[2] <- "Coefficient"
+
+coef_table$Coefficient <- round(coef_table$Coefficient, 3)
+
+knitr::kable(coef_table, caption = "Ridge Model Coefficients")
+```
+
+
+```{r echo=FALSE}
+plot(cv_ridge)
+cv_ridge$lambda.min
+```
+
+```{r}
+cv_lasso$cvm[cv_lasso$lambda == cv_lasso$lambda.min]
+cv_ridge$cvm[cv_ridge$lambda == cv_ridge$lambda.min]
+```
+
 
 # Results
 
+```{r}
+x_test <- model.matrix(~ ., data = test_model)[, -1]
+```
+
+```{r}
+pred <- predict(cv_lasso, newx = x_test, s = "lambda.min", type = "response")
+
+test_with_preds <- test %>%
+  mutate(
+    hof_prob = as.vector(pred)
+  )
+
+test_with_preds <- test_with_preds %>%
+  select(player, hof_prob) %>%
+  distinct(player, .keep_all = TRUE) %>% 
+  arrange(desc(hof_prob))
+```
+
+```{r}
+test_with_preds
+```
+
+
 # Discussion
+
+No Rudy Gobert
 
 ## Limitations
 
 ## Next Steps
 
-# Bibliography
+# Appendix
 
 https://www.sportingnews.com/us/nba/news/michael-jordan-vs-lebron-james-goat-debate/sl8xdozy5u1m1s4t5m3npeqo1
 
